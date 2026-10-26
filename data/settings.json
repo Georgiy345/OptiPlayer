@@ -1,0 +1,28 @@
+{
+  "volume": 70,
+  "muted": false,
+  "speed": 1.0,
+  "volume_step": 5,
+  "repeat": "off",
+  "aspect": "fit",
+  "sidebar": false,
+  "always_on_top": false,
+  "media_keys": true,
+  "geometry": [
+    560,
+    266,
+    1440,
+    860
+  ],
+  "maximized": false,
+  "recent": [
+    "R:\\Моменты\\Valorant\\Valorant 2026.10.27 - 00.30.41.04.DVR.mp4",
+    "R:\\Моменты\\Valorant\\Valorant 2026.10.23 - 00.32.20.04.DVR.mp4"
+  ],
+  "resume": {
+    "r:\\моменты\\valorant\\valorant 2026.10.23 - 00.32.20.04.dvr.mp4": 60749,
+    "r:\\моменты\\valorant\\valorant 2026.10.27 - 00.30.41.04.dvr.mp4": 112905
+  },
+  "last_dir": "R:\\Моменты\\Valorant",
+  "subtitles": true
+}
