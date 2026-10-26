@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 from . import theme
 from .utils import format_time
 from .widgets import (
+    CaptionButton,
     CenterPlayButton,
     DropOverlay,
     IconButton,
@@ -82,7 +83,7 @@ class TitleBar(QWidget):
         self._moving = False
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(14, 0, 8, 0)
+        layout.setContentsMargins(14, 0, 0, 0)
         layout.setSpacing(8)
 
         self.logo = LogoWidget(22, self)
@@ -102,16 +103,19 @@ class TitleBar(QWidget):
                                   checkable=True)
         self.btn_playlist = IconButton("playlist", self, size=32, icon_size=17,
                                        tooltip="Плейлист", checkable=True)
-        self.btn_min = IconButton("minimize", self, size=30, icon_size=15, tooltip="Свернуть")
-        self.btn_max = IconButton("maximize", self, size=30, icon_size=15, tooltip="Развернуть")
-        self.btn_close = IconButton("close", self, size=30, icon_size=14, tooltip="Закрыть",
-                                    hover_tint=theme.DANGER_SOFT)
+        self.btn_min = CaptionButton("minimize", self, tooltip="Свернуть")
+        self.btn_max = CaptionButton("maximize", self, tooltip="Развернуть")
+        self.btn_close = CaptionButton("close", self, tooltip="Закрыть", danger=True)
         for button in (self.btn_pin, self.btn_playlist):
             layout.addSpacing(2)
             layout.addWidget(button)
-        layout.addSpacing(6)
+        layout.addSpacing(8)
+        caption_row = QHBoxLayout()
+        caption_row.setContentsMargins(0, 0, 0, 0)
+        caption_row.setSpacing(0)
         for button in (self.btn_min, self.btn_max, self.btn_close):
-            layout.addWidget(button)
+            caption_row.addWidget(button)
+        layout.addLayout(caption_row)
 
         self.btn_min.clicked.connect(self.minimizeRequested)
         self.btn_max.clicked.connect(self.maximizeRequested)

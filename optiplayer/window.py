@@ -59,6 +59,7 @@ VIDEO_FILTER = (
 
 HTLEFT, HTRIGHT, HTTOP, HTTOPLEFT, HTTOPRIGHT = 10, 11, 12, 13, 14
 HTBOTTOM, HTBOTTOMLEFT, HTBOTTOMRIGHT = 15, 16, 17
+HTCLIENT = 1
 WM_NCHITTEST = 0x0084
 WM_HOTKEY = 0x0312
 WM_APPCOMMAND = 0x0319
@@ -97,6 +98,7 @@ class PlayerWindow(QMainWindow):
         self._aspect = str(settings.get("aspect", "fit"))
         if self._aspect not in ASPECT_MODES:
             self._aspect = "fit"
+        self._maximize_aspect_saved: str | None = None
         self._scrubbing = False
         self._last_scrub = 0.0
         self._ended = False
@@ -316,6 +318,8 @@ class PlayerWindow(QMainWindow):
         self._apply_dwm()
         QTimer.singleShot(0, self.surface.layout_overlays)
         QTimer.singleShot(0, self._refresh_media_hotkeys)
+        QTimer.singleShot(0, self._sync_window_aspect)
+        QTimer.singleShot(0, self._apply_window_edge_mode)
 
     def changeEvent(self, event) -> None:
         super().changeEvent(event)
@@ -325,6 +329,8 @@ class PlayerWindow(QMainWindow):
             self.surface.controls.set_fullscreen_checked(self._fullscreen)
             if not self.isMaximized() and not self.isFullScreen() and self.isVisible():
                 self._normal_geometry = self.geometry()
+            self._sync_window_aspect()
+            self._apply_window_edge_mode()
             QTimer.singleShot(0, self.surface.layout_overlays)
 
     def resizeEvent(self, event) -> None:
@@ -356,6 +362,8 @@ class PlayerWindow(QMainWindow):
                     width = self.width()
                     height = self.height()
                     border = 6.0
+                    if self._caption_button_hit(x, y):
+                        return True, HTCLIENT
                     left = x < border
                     right = x > width - border
                     top = y < border
@@ -379,6 +387,19 @@ class PlayerWindow(QMainWindow):
             except Exception:
                 pass
         return super().nativeEvent(event_type, message)
+
+    def _caption_button_hit(self, x: float, y: float) -> bool:
+        try:
+            for button in (self.titlebar.btn_min, self.titlebar.btn_max,
+                           self.titlebar.btn_close):
+                if not button.isVisible():
+                    continue
+                origin = button.mapTo(self, QPoint(0, 0))
+                if QRect(origin, button.size()).contains(int(x), int(y)):
+                    return True
+        except Exception:
+            pass
+        return False
 
     def event(self, event) -> bool:
         if event.type() == QEvent.Type.WindowActivate:
@@ -694,7 +715,7 @@ class PlayerWindow(QMainWindow):
         self.settings.set("muted", self._muted)
         self.settings.set("speed", self._speed)
         self.settings.set("repeat", self._repeat)
-        self.settings.set("aspect", self._aspect)
+        self.settings.set("aspect", self._aspect_to_save())
         self.settings.set("media_keys", self._media_keys_enabled)
         self.settings.save()
 
@@ -1024,6 +1045,30 @@ class PlayerWindow(QMainWindow):
         self.surface.controls.set_repeat(self._repeat)
 
     # --------------------------------------------------------------- aspect
+    def _aspect_to_save(self) -> str:
+        return self._maximize_aspect_saved or self._aspect
+
+    def _sync_window_aspect(self) -> None:
+        maximized = self.isMaximized() and not self._fullscreen
+        if maximized:
+            if self._maximize_aspect_saved is None and self._aspect == "fit":
+                self._maximize_aspect_saved = "fit"
+                self._aspect = "fill"
+                self._apply_aspect()
+        elif self._maximize_aspect_saved is not None:
+            self._aspect = self._maximize_aspect_saved
+            self._maximize_aspect_saved = None
+            self._apply_aspect()
+
+    def _apply_window_edge_mode(self) -> None:
+        """Remove the 1 px Windows frame in maximized mode as well."""
+        if not win32.IS_WINDOWS or self._fullscreen:
+            return
+        try:
+            win32.set_fullscreen_frame(int(self.winId()), self.isMaximized())
+        except Exception:
+            pass
+
     def _apply_aspect(self) -> None:
         self.surface.set_aspect(self._aspect)
         if not self._has_media():
@@ -1033,6 +1078,7 @@ class PlayerWindow(QMainWindow):
     def _set_aspect(self, mode: str) -> None:
         if mode not in ASPECT_MODES:
             return
+        self._maximize_aspect_saved = None
         self._aspect = mode
         self._apply_aspect()
         self.surface.show_toast(f"Масштаб · {ASPECT_MODES[mode][0]}", timeout=1300)
@@ -1165,6 +1211,7 @@ class PlayerWindow(QMainWindow):
         self.surface.controls.seek.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.surface.video.setFocus()
         self._refresh_media_hotkeys()
+        self._sync_window_aspect()
 
     def _reapply_fullscreen_frame(self) -> None:
         if not self._fullscreen:
@@ -1187,7 +1234,7 @@ class PlayerWindow(QMainWindow):
                 win32.set_fullscreen_frame(hwnd, True)
                 win32.set_window_topmost(hwnd, True)
             else:
-                win32.set_fullscreen_frame(hwnd, False)
+                win32.set_fullscreen_frame(hwnd, self.isMaximized())
                 win32.set_window_topmost(hwnd, self.is_always_on_top())
         except Exception:
             pass
@@ -1195,6 +1242,7 @@ class PlayerWindow(QMainWindow):
     def _restore_window_frame(self) -> None:
         if not self._fullscreen:
             self._apply_fullscreen_native(False)
+            self._apply_window_edge_mode()
 
     def exit_fullscreen(self) -> None:
         if not self._fullscreen:
@@ -1218,6 +1266,8 @@ class PlayerWindow(QMainWindow):
             self.showNormal()
         self._apply_fullscreen_native(False)
         QTimer.singleShot(60, self._restore_window_frame)
+        self._sync_window_aspect()
+        self._apply_window_edge_mode()
         self._show_chrome()
         self._restart_hide_timer()
         self.surface.layout_overlays()
@@ -1231,6 +1281,8 @@ class PlayerWindow(QMainWindow):
             self.showNormal()
         else:
             self.showMaximized()
+        self._sync_window_aspect()
+        self._apply_window_edge_mode()
         QTimer.singleShot(30, self.surface.layout_overlays)
 
     # -------------------------------------------------------------- sidebar
@@ -1772,6 +1824,8 @@ class PlayerWindow(QMainWindow):
         self._apply_dwm()
         if was_fullscreen:
             self._apply_fullscreen_native(True)
+        self._sync_window_aspect()
+        self._apply_window_edge_mode()
         self.titlebar.set_pin(checked)
         self.settings.set("always_on_top", checked)
         self._refresh_media_hotkeys()
@@ -1799,7 +1853,7 @@ class PlayerWindow(QMainWindow):
         self.settings.set("muted", self._muted)
         self.settings.set("speed", self._speed)
         self.settings.set("repeat", self._repeat)
-        self.settings.set("aspect", self._aspect)
+        self.settings.set("aspect", self._aspect_to_save())
         self.settings.set("media_keys", self._media_keys_enabled)
         self.settings.set("sidebar", self.playlist_panel.isVisible() if not self._fullscreen
                           else self._sidebar_restore)

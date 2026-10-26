@@ -1,0 +1,16 @@
+# Local Python environment and runtime data
+.venv/
+__pycache__/
+*.py[cod]
+.pip-cache/
+.tmp/
+dev/
+
+# User data: settings, logs, screenshots
+data/
+snapshots/
+
+# Machine-specific shortcuts and caches
+*.lnk
+*.log
+*.qmlc

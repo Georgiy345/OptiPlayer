@@ -255,6 +255,45 @@ class IconButton(QAbstractButton):
             )
 
 
+class CaptionButton(IconButton):
+    """Full-height window caption button; the whole block is clickable."""
+
+    def __init__(self, icon_name: str, parent: QWidget | None = None, *,
+                 tooltip: str = "", danger: bool = False) -> None:
+        super().__init__(icon_name, parent, size=(46, 48), icon_size=15,
+                         tooltip=tooltip)
+        self._danger = danger
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        rect = QRectF(self.rect())
+        hover = clamp(self._hover, 0.0, 1.0)
+        if self.isDown():
+            hover = 1.0
+
+        if hover > 0.01:
+            if self._danger:
+                color = QColor("#A8261A" if self.isDown() else "#C42B1C")
+                color.setAlpha(int(245 * hover))
+            else:
+                color = QColor(255, 255, 255, int((28 if self.isDown() else 18) * hover))
+            painter.fillRect(rect, color)
+
+        if not self.isEnabled():
+            painter.setOpacity(0.35)
+        icon_color = "#FFFFFF" if hover > 0.35 else "#C9D2E3"
+        center = rect.center()
+        icons.draw_icon(
+            painter,
+            self._icon_name,
+            icon_color,
+            QRectF(center.x() - self._icon_size / 2,
+                   center.y() - self._icon_size / 2,
+                   self._icon_size, self._icon_size),
+        )
+
+
 class TextButton(QAbstractButton):
     def __init__(
         self,

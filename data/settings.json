@@ -9,20 +9,30 @@
   "always_on_top": false,
   "media_keys": true,
   "geometry": [
-    560,
-    266,
+    460,
+    263,
     1440,
     860
   ],
-  "maximized": false,
+  "maximized": true,
   "recent": [
+    "R:\\Моменты\\Desktop\\Desktop 2026.06.26 - 23.28.24.06.DVR.mp4",
+    "R:\\Моменты\\Desktop\\Desktop 2026.06.26 - 23.27.21.05.DVR.mp4",
+    "R:\\Моменты\\Desktop\\Desktop 2026.05.24 - 23.41.18.26.DVR.mp4",
+    "R:\\Моменты\\Desktop\\Desktop 2026.06.26 - 23.00.24.04.DVR.mp4",
+    "R:\\Моменты\\Valorant\\Valorant 2026.10.26 - 22.38.35.03.DVR.mp4",
     "R:\\Моменты\\Valorant\\Valorant 2026.10.27 - 00.30.41.04.DVR.mp4",
+    "D:\\Лекции\\3 семестр\\2026-09-12 13-34-15.mp4",
     "R:\\Моменты\\Valorant\\Valorant 2026.10.23 - 00.32.20.04.DVR.mp4"
   ],
   "resume": {
     "r:\\моменты\\valorant\\valorant 2026.10.23 - 00.32.20.04.dvr.mp4": 60749,
-    "r:\\моменты\\valorant\\valorant 2026.10.27 - 00.30.41.04.dvr.mp4": 112905
+    "r:\\моменты\\valorant\\valorant 2026.10.27 - 00.30.41.04.dvr.mp4": 111368,
+    "d:\\лекции\\3 семестр\\2026-09-12 13-34-15.mp4": 789184,
+    "r:\\моменты\\valorant\\valorant 2026.10.26 - 22.38.35.03.dvr.mp4": 115484,
+    "r:\\моменты\\desktop\\desktop 2026.06.26 - 23.00.24.04.dvr.mp4": 109160,
+    "r:\\моменты\\desktop\\desktop 2026.06.26 - 23.27.21.05.dvr.mp4": 118205
   },
-  "last_dir": "R:\\Моменты\\Valorant",
+  "last_dir": "R:\\Моменты\\Desktop",
   "subtitles": true
 }
