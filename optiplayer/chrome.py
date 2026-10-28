@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QPoint, QRectF, QSize, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetricsF, QLinearGradient, QPainter, QPen
+from PySide6.QtGui import QColor, QFont, QFontMetricsF, QGuiApplication, QLinearGradient, QPainter, QPen
 from PySide6.QtQuickWidgets import QQuickWidget
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -81,6 +81,7 @@ class TitleBar(QWidget):
         self._file_name = ""
         self._folder = ""
         self._press_global: QPoint | None = None
+        self._window_origin: QPoint | None = None
         self._moving = False
 
         layout = QHBoxLayout(self)
@@ -159,31 +160,70 @@ class TitleBar(QWidget):
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self._press_global = event.globalPosition().toPoint()
+            self._window_origin = self.window().pos()
             self._moving = False
             event.accept()
             return
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event) -> None:
-        if self._press_global is not None and event.buttons() & Qt.MouseButton.LeftButton:
-            delta = event.globalPosition().toPoint() - self._press_global
-            if not self._moving and (abs(delta.x()) > 4 or abs(delta.y()) > 4):
-                self._moving = True
-                handle = self.window().windowHandle()
-                if handle is not None:
-                    handle.startSystemMove()
-            event.accept()
+        if self._press_global is None or not (event.buttons() & Qt.MouseButton.LeftButton):
+            super().mouseMoveEvent(event)
             return
-        super().mouseMoveEvent(event)
+        current = event.globalPosition().toPoint()
+        delta = current - self._press_global
+        if not self._moving:
+            if abs(delta.x()) <= 4 and abs(delta.y()) <= 4:
+                return
+            self._moving = True
+            window = self.window()
+            if window.isMaximized():
+                normal = window.normalGeometry()
+                if not normal.isValid():
+                    normal = window.geometry()
+                titlebar_global = self.mapToGlobal(QPoint(0, 0))
+                fraction = (self._press_global.x() - titlebar_global.x()) / max(1, self.width())
+                fraction = max(0.0, min(1.0, fraction))
+                window.showNormal()
+                window.setGeometry(
+                    int(current.x() - normal.width() * fraction),
+                    int(current.y() - 24),
+                    normal.width(), normal.height(),
+                )
+                self._press_global = current
+                self._window_origin = window.pos()
+            else:
+                self._window_origin = window.pos()
+        if self._window_origin is not None:
+            self.window().move(self._window_origin + (current - self._press_global))
+        event.accept()
 
     def mouseReleaseEvent(self, event) -> None:
+        if self._press_global is not None and self._moving:
+            window = self.window()
+            current = event.globalPosition().toPoint()
+            screen = QGuiApplication.screenAt(current) or window.screen()
+            if screen is not None and not window.isMaximized():
+                top = screen.availableGeometry().top()
+                if window.y() <= top + 3 or current.y() <= top + 3:
+                    if window.y() < top:
+                        window.move(window.x(), top)
+                    self._press_global = None
+                    self._window_origin = None
+                    self._moving = False
+                    self.maximizeRequested.emit()
+                    event.accept()
+                    return
         self._press_global = None
+        self._window_origin = None
         self._moving = False
         super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self._press_global = None
+            self._window_origin = None
+            self._moving = False
             self.maximizeRequested.emit()
             event.accept()
             return
