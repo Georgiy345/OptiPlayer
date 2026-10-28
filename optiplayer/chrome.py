@@ -72,6 +72,7 @@ class TitleBar(QWidget):
     closeRequested = Signal()
     pinToggled = Signal(bool)
     playlistToggled = Signal(bool)
+    cleanRequested = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -99,6 +100,8 @@ class TitleBar(QWidget):
         layout.addWidget(self.file_label, 1)
         layout.addSpacing(8)
 
+        self.btn_clean = IconButton("eye_off", self, size=32, icon_size=17,
+                                    tooltip="Скрыть интерфейс (Tab)")
         self.btn_pin = IconButton("pin", self, size=32, icon_size=16, tooltip="Поверх всех окон",
                                   checkable=True)
         self.btn_playlist = IconButton("playlist", self, size=32, icon_size=17,
@@ -106,7 +109,7 @@ class TitleBar(QWidget):
         self.btn_min = CaptionButton("minimize", self, tooltip="Свернуть")
         self.btn_max = CaptionButton("maximize", self, tooltip="Развернуть")
         self.btn_close = CaptionButton("close", self, tooltip="Закрыть", danger=True)
-        for button in (self.btn_pin, self.btn_playlist):
+        for button in (self.btn_clean, self.btn_pin, self.btn_playlist):
             layout.addSpacing(2)
             layout.addWidget(button)
         layout.addSpacing(8)
@@ -122,6 +125,7 @@ class TitleBar(QWidget):
         self.btn_close.clicked.connect(self.closeRequested)
         self.btn_pin.toggled.connect(self.pinToggled)
         self.btn_playlist.toggled.connect(self.playlistToggled)
+        self.btn_clean.clicked.connect(self.cleanRequested)
 
     def set_file(self, name: str, folder: str) -> None:
         self._file_name = name

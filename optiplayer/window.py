@@ -98,7 +98,8 @@ class PlayerWindow(QMainWindow):
         self._aspect = str(settings.get("aspect", "fit"))
         if self._aspect not in ASPECT_MODES:
             self._aspect = "fit"
-        self._maximize_aspect_saved: str | None = None
+        self._ui_hidden = False
+        self._clean_sidebar_visible = False
         self._scrubbing = False
         self._last_scrub = 0.0
         self._ended = False
@@ -208,6 +209,7 @@ class PlayerWindow(QMainWindow):
         tb.closeRequested.connect(self.close)
         tb.pinToggled.connect(self.set_always_on_top)
         tb.playlistToggled.connect(self.set_sidebar)
+        tb.cleanRequested.connect(lambda: self.set_clean_mode(True))
 
         surface = self.surface
         dock = surface.controls
@@ -318,7 +320,6 @@ class PlayerWindow(QMainWindow):
         self._apply_dwm()
         QTimer.singleShot(0, self.surface.layout_overlays)
         QTimer.singleShot(0, self._refresh_media_hotkeys)
-        QTimer.singleShot(0, self._sync_window_aspect)
         QTimer.singleShot(0, self._apply_window_edge_mode)
 
     def changeEvent(self, event) -> None:
@@ -329,7 +330,6 @@ class PlayerWindow(QMainWindow):
             self.surface.controls.set_fullscreen_checked(self._fullscreen)
             if not self.isMaximized() and not self.isFullScreen() and self.isVisible():
                 self._normal_geometry = self.geometry()
-            self._sync_window_aspect()
             self._apply_window_edge_mode()
             QTimer.singleShot(0, self.surface.layout_overlays)
 
@@ -623,8 +623,9 @@ class PlayerWindow(QMainWindow):
         self._pending_resume = int(self.settings.get_resume(path)) if autoplay else 0
 
         self.surface.set_start_visible(False)
-        self.surface.controls.show()
-        self.surface.set_loading(True)
+        if not self._ui_hidden:
+            self.surface.controls.show()
+        self._set_loading(True)
         self.surface.set_center_visible(False)
         self.surface.set_subtitle_text("")
         self.surface.subtitles.hide()
@@ -678,7 +679,7 @@ class PlayerWindow(QMainWindow):
 
     def _set_loading(self, loading: bool) -> None:
         self._loading = bool(loading)
-        self.surface.set_loading(loading)
+        self.surface.set_loading(loading and not self._ui_hidden)
         if not loading:
             self._loading_timer.stop()
             self._sync_center()
@@ -715,7 +716,7 @@ class PlayerWindow(QMainWindow):
         self.settings.set("muted", self._muted)
         self.settings.set("speed", self._speed)
         self.settings.set("repeat", self._repeat)
-        self.settings.set("aspect", self._aspect_to_save())
+        self.settings.set("aspect", self._aspect)
         self.settings.set("media_keys", self._media_keys_enabled)
         self.settings.save()
 
@@ -797,11 +798,13 @@ class PlayerWindow(QMainWindow):
                 QTimer.singleShot(80, self._apply_resume)
             self._update_badge()
             self._on_tracks_changed()
-            self.surface.controls.show()
+            if not self._ui_hidden:
+                self.surface.controls.show()
             self._show_chrome()
         elif status in (QMediaPlayer.MediaStatus.BufferingMedia, QMediaPlayer.MediaStatus.StalledMedia):
             if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
-                self.surface.set_loading(True)
+                if not self._ui_hidden:
+                    self.surface.set_loading(True)
         elif status == QMediaPlayer.MediaStatus.BufferedMedia:
             if not self._loading:
                 self.surface.set_loading(False)
@@ -831,8 +834,11 @@ class PlayerWindow(QMainWindow):
         self.player.pause()
         self._save_position()
         self.surface.controls.set_playing(False, True)
-        self.surface.set_center_visible(True, ended=True)
-        self.surface.controls.show()
+        if self._ui_hidden:
+            self.surface.set_center_visible(False)
+        else:
+            self.surface.set_center_visible(True, ended=True)
+            self.surface.controls.show()
         self._show_chrome()
         self.playlist_panel.set_playing(self._index, False)
         self._handling_end = False
@@ -864,7 +870,8 @@ class PlayerWindow(QMainWindow):
             text = "Не удалось воспроизвести файл"
         if len(self._playlist) <= 1:
             self._show_start_page()
-        self.surface.controls.show()
+        if not self._ui_hidden:
+            self.surface.controls.show()
         self._show_chrome()
         self.surface.show_toast(text, timeout=4200)
 
@@ -874,6 +881,9 @@ class PlayerWindow(QMainWindow):
         self._sync_center()
 
     def _sync_center(self) -> None:
+        if self._ui_hidden:
+            self.surface.set_center_visible(False)
+            return
         if not self._has_media() or self.surface.start_page.isVisible() or self._loading:
             self.surface.set_center_visible(False)
             return
@@ -1045,21 +1055,6 @@ class PlayerWindow(QMainWindow):
         self.surface.controls.set_repeat(self._repeat)
 
     # --------------------------------------------------------------- aspect
-    def _aspect_to_save(self) -> str:
-        return self._maximize_aspect_saved or self._aspect
-
-    def _sync_window_aspect(self) -> None:
-        maximized = self.isMaximized() and not self._fullscreen
-        if maximized:
-            if self._maximize_aspect_saved is None and self._aspect == "fit":
-                self._maximize_aspect_saved = "fit"
-                self._aspect = "fill"
-                self._apply_aspect()
-        elif self._maximize_aspect_saved is not None:
-            self._aspect = self._maximize_aspect_saved
-            self._maximize_aspect_saved = None
-            self._apply_aspect()
-
     def _apply_window_edge_mode(self) -> None:
         """Remove the 1 px Windows frame in maximized mode as well."""
         if not win32.IS_WINDOWS or self._fullscreen:
@@ -1078,7 +1073,6 @@ class PlayerWindow(QMainWindow):
     def _set_aspect(self, mode: str) -> None:
         if mode not in ASPECT_MODES:
             return
-        self._maximize_aspect_saved = None
         self._aspect = mode
         self._apply_aspect()
         self.surface.show_toast(f"Масштаб · {ASPECT_MODES[mode][0]}", timeout=1300)
@@ -1211,7 +1205,6 @@ class PlayerWindow(QMainWindow):
         self.surface.controls.seek.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.surface.video.setFocus()
         self._refresh_media_hotkeys()
-        self._sync_window_aspect()
 
     def _reapply_fullscreen_frame(self) -> None:
         if not self._fullscreen:
@@ -1251,7 +1244,8 @@ class PlayerWindow(QMainWindow):
         self.setCursor(Qt.CursorShape.ArrowCursor)
         self.surface.setCursor(Qt.CursorShape.ArrowCursor)
         self.surface.video.setCursor(Qt.CursorShape.ArrowCursor)
-        self.titlebar.show()
+        if not self._ui_hidden:
+            self.titlebar.show()
         self.surface.set_fullscreen(False)
         self.surface.controls.set_fullscreen_checked(False)
         self.surface.top_bar.hide()
@@ -1266,7 +1260,6 @@ class PlayerWindow(QMainWindow):
             self.showNormal()
         self._apply_fullscreen_native(False)
         QTimer.singleShot(60, self._restore_window_frame)
-        self._sync_window_aspect()
         self._apply_window_edge_mode()
         self._show_chrome()
         self._restart_hide_timer()
@@ -1281,7 +1274,6 @@ class PlayerWindow(QMainWindow):
             self.showNormal()
         else:
             self.showMaximized()
-        self._sync_window_aspect()
         self._apply_window_edge_mode()
         QTimer.singleShot(30, self.surface.layout_overlays)
 
@@ -1369,11 +1361,19 @@ class PlayerWindow(QMainWindow):
 
     # ---------------------------------------------------------------- chrome
     def _on_mouse_moved(self) -> None:
+        if self._ui_hidden:
+            self._restore_cursor()
+            self._hide_timer.start()
+            return
         self._show_chrome()
         if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
             self._hide_timer.start()
 
     def _show_chrome(self) -> None:
+        if self._ui_hidden:
+            self._restore_cursor()
+            self._hide_timer.start()
+            return
         if self.surface.start_page.isVisible():
             return
         self.surface.controls.show()
@@ -1388,7 +1388,62 @@ class PlayerWindow(QMainWindow):
         self.surface.setCursor(Qt.CursorShape.ArrowCursor)
         self.surface.video.setCursor(Qt.CursorShape.ArrowCursor)
 
+    def _hide_cursor(self) -> None:
+        self.setCursor(Qt.CursorShape.BlankCursor)
+        self.surface.setCursor(Qt.CursorShape.BlankCursor)
+        self.surface.video.setCursor(Qt.CursorShape.BlankCursor)
+
+    def toggle_clean_mode(self) -> None:
+        self.set_clean_mode(not self._ui_hidden)
+
+    def set_clean_mode(self, enabled: bool) -> None:
+        if enabled == self._ui_hidden:
+            return
+        if enabled:
+            if not self._has_media():
+                self.surface.show_toast("Сначала откройте видео", timeout=1400)
+                return
+            self._clean_sidebar_visible = self.playlist_panel.isVisible()
+            self._ui_hidden = True
+            if self._clean_sidebar_visible:
+                self._set_sidebar_visible(False, persist=False)
+            self.titlebar.hide()
+            self.surface.controls.hide()
+            self.surface.top_bar.hide()
+            self.surface.set_center_visible(False)
+            self.surface.set_loading(False)
+            self._hide_timer.stop()
+            self._restore_cursor()
+            self.surface.layout_overlays()
+            self._hide_timer.start()
+            QTimer.singleShot(0, self.surface.layout_overlays)
+        else:
+            self._ui_hidden = False
+            if not self._fullscreen:
+                self.titlebar.show()
+            if self._clean_sidebar_visible and not self._fullscreen:
+                self._set_sidebar_visible(True, persist=False)
+            self._clean_sidebar_visible = False
+            self._show_chrome()
+            self._sync_center()
+            self.surface.set_loading(self._loading)
+            self._restore_cursor()
+            self.surface.layout_overlays()
+            if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+                self._hide_timer.start()
+            else:
+                self._hide_timer.stop()
+
     def _maybe_hide_chrome(self) -> None:
+        if self._ui_hidden:
+            if self._scrubbing or self._menu_open:
+                self._hide_timer.start()
+                return
+            if self.surface.toast.underMouse():
+                self._hide_timer.start()
+                return
+            self._hide_cursor()
+            return
         if self.surface.start_page.isVisible():
             return
         if self._scrubbing or self._menu_open:
@@ -1402,17 +1457,20 @@ class PlayerWindow(QMainWindow):
         self.surface.controls.hide()
         self.surface.top_bar.hide()
         if self._fullscreen and not self.playlist_panel.isVisible():
-            self.setCursor(Qt.CursorShape.BlankCursor)
-            self.surface.setCursor(Qt.CursorShape.BlankCursor)
-            self.surface.video.setCursor(Qt.CursorShape.BlankCursor)
+            self._hide_cursor()
         self.surface.layout_overlays()
 
     def _restart_hide_timer(self) -> None:
-        if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+        if self._ui_hidden or self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
             self._hide_timer.start()
 
     # ------------------------------------------------------------- start page
     def _show_start_page(self) -> None:
+        if self._ui_hidden:
+            self._ui_hidden = False
+            self._clean_sidebar_visible = False
+            if not self._fullscreen:
+                self.titlebar.show()
         self._refresh_start_recents()
         self.surface.set_start_visible(True)
         self.surface.controls.hide()
@@ -1505,6 +1563,12 @@ class PlayerWindow(QMainWindow):
                     callback=lambda checked: self.set_always_on_top(checked))
         menu_action(menu, "Медиаклавиши", checked=self._media_keys_enabled,
                     callback=self.set_media_keys_enabled)
+        if self._ui_hidden:
+            menu_action(menu, "Показать интерфейс", icon="eye",
+                        callback=lambda: self.set_clean_mode(False))
+        else:
+            menu_action(menu, "Скрыть интерфейс", icon="eye_off",
+                        callback=lambda: self.set_clean_mode(True))
         menu_action(menu, "Во весь экран", checked=self._fullscreen,
                     callback=self.toggle_fullscreen)
         menu.addSeparator()
@@ -1604,7 +1668,8 @@ class PlayerWindow(QMainWindow):
             ("↑ / ↓", "Громкость"),
             ("M", "Выключить / включить звук"),
             ("F / F11", "Полноэкранный режим"),
-            ("Esc", "Выйти из полного экрана"),
+            ("Tab", "Скрыть / показать интерфейс"),
+            ("Esc", "Выйти из полного экрана / показать интерфейс"),
             ("P", "Показать / скрыть плейлист"),
             ("S", "Снимок текущего кадра"),
             ("[ / ]", "Скорость воспроизведения"),
@@ -1684,6 +1749,10 @@ class PlayerWindow(QMainWindow):
 
         if self._handle_media_key(key, native):
             return True
+        if key == Qt.Key.Key_Tab:
+            if not event.isAutoRepeat():
+                self.toggle_clean_mode()
+            return True
         if key == Qt.Key.Key_Space:
             if not event.isAutoRepeat():
                 self.toggle_play()
@@ -1718,9 +1787,16 @@ class PlayerWindow(QMainWindow):
             if self._fullscreen:
                 self.exit_fullscreen()
                 return True
+            if self._ui_hidden:
+                self.set_clean_mode(False)
+                return True
             return False
         if key == Qt.Key.Key_P or letter == "P":
-            self.set_sidebar(not self.playlist_panel.isVisible())
+            if self._ui_hidden:
+                self.set_clean_mode(False)
+                self.set_sidebar(True)
+            else:
+                self.set_sidebar(not self.playlist_panel.isVisible())
             return True
         if (key == Qt.Key.Key_S or letter == "S") and not ctrl:
             self.take_snapshot()
@@ -1824,7 +1900,6 @@ class PlayerWindow(QMainWindow):
         self._apply_dwm()
         if was_fullscreen:
             self._apply_fullscreen_native(True)
-        self._sync_window_aspect()
         self._apply_window_edge_mode()
         self.titlebar.set_pin(checked)
         self.settings.set("always_on_top", checked)
@@ -1853,10 +1928,15 @@ class PlayerWindow(QMainWindow):
         self.settings.set("muted", self._muted)
         self.settings.set("speed", self._speed)
         self.settings.set("repeat", self._repeat)
-        self.settings.set("aspect", self._aspect_to_save())
+        self.settings.set("aspect", self._aspect)
         self.settings.set("media_keys", self._media_keys_enabled)
-        self.settings.set("sidebar", self.playlist_panel.isVisible() if not self._fullscreen
-                          else self._sidebar_restore)
+        if self._fullscreen:
+            sidebar_visible = self._sidebar_restore
+        elif self._ui_hidden:
+            sidebar_visible = self._clean_sidebar_visible
+        else:
+            sidebar_visible = self.playlist_panel.isVisible()
+        self.settings.set("sidebar", sidebar_visible)
         self.settings.save()
         self._hide_timer.stop()
         self._resume_timer.stop()
