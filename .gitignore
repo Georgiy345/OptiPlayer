@@ -10,6 +10,11 @@ dev/
 data/
 snapshots/
 
+# Build artifacts
+build/
+dist/
+release/
+
 # Machine-specific shortcuts and caches
 *.lnk
 *.log

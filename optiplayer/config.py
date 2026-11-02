@@ -4,15 +4,27 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
 
 APP_DIR = Path(__file__).resolve().parent.parent
-ASSETS_DIR = APP_DIR / "assets"
-DATA_DIR = APP_DIR / "data"
+
+if getattr(sys, "frozen", False):
+    # Installed build: keep user data in a writable per-user folder instead of
+    # the temporary PyInstaller extraction directory.
+    _base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
+    DATA_DIR = _base / "OptiPlayer"
+    ASSETS_DIR = Path(getattr(sys, "_MEIPASS", APP_DIR)) / "assets"
+    SNAPSHOT_DIR = Path.home() / "Pictures" / "OptiPlayer"
+else:
+    # Portable/source build: everything lives next to the application.
+    ASSETS_DIR = APP_DIR / "assets"
+    DATA_DIR = APP_DIR / "data"
+    SNAPSHOT_DIR = APP_DIR / "snapshots"
+
 CACHE_DIR = DATA_DIR / "cache"
-SNAPSHOT_DIR = APP_DIR / "snapshots"
 LOG_FILE = DATA_DIR / "optiplayer.log"
 SETTINGS_FILE = DATA_DIR / "settings.json"
 
