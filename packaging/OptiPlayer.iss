@@ -2,7 +2,7 @@
 ; Build: ISCC.exe packaging\OptiPlayer.iss
 
 #define AppName "OptiPlayer"
-#define AppVersion "1.0.0"
+#define AppVersion "1.0.1"
 #define AppPublisher "OptiPlayer"
 #define AppExeName "OptiPlayer.exe"
 #define AppId "{{7E2C4A18-5B93-4F6D-9C21-8A4E0D7B3F52}"
@@ -32,7 +32,7 @@ CloseApplications=yes
 RestartApplications=no
 AllowNoIcons=yes
 InfoAfterFile=after_install.txt
-VersionInfoVersion=1.0.0.0
+VersionInfoVersion=1.0.1.0
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} Setup
 VersionInfoProductName={#AppName}

@@ -8,7 +8,7 @@ import sys
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QStyleFactory
 
-from . import icons, theme
+from . import __version__, icons, theme
 from .config import LOG_FILE, Settings, ensure_dirs
 from .utils import log_exception, set_app_user_model_id, set_awake
 from .window import PlayerWindow
@@ -34,6 +34,7 @@ def main(argv: list[str]) -> int:
 
     app = QApplication(argv)
     app.setApplicationName("OptiPlayer")
+    app.setApplicationVersion(__version__)
     app.setOrganizationName("OptiPlayer")
     app.setDesktopFileName("OptiPlayer")
     app.setStyle(QStyleFactory.create("Fusion"))

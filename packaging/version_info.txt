@@ -3,8 +3,8 @@
 # Version resource for the OptiPlayer executable.
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 0, 0),
-    prodvers=(1, 0, 0, 0),
+    filevers=(1, 0, 1, 0),
+    prodvers=(1, 0, 1, 0),
     mask=0x3F,
     flags=0x0,
     OS=0x40004,
@@ -18,12 +18,12 @@ VSVersionInfo(
         '040904B0',
         [StringStruct('CompanyName', 'OptiPlayer'),
          StringStruct('FileDescription', 'OptiPlayer — быстрый видеоплеер'),
-         StringStruct('FileVersion', '1.0.0'),
+         StringStruct('FileVersion', '1.0.1'),
          StringStruct('InternalName', 'OptiPlayer'),
          StringStruct('LegalCopyright', 'OptiPlayer'),
          StringStruct('OriginalFilename', 'OptiPlayer.exe'),
          StringStruct('ProductName', 'OptiPlayer'),
-         StringStruct('ProductVersion', '1.0.0')])
+         StringStruct('ProductVersion', '1.0.1')])
     ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]

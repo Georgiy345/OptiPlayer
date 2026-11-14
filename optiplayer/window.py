@@ -11,7 +11,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import QGuiApplication, QKeyEvent
-from PySide6.QtMultimedia import QAudioOutput, QMediaMetaData, QMediaPlayer
+from PySide6.QtMultimedia import QAudioOutput, QMediaDevices, QMediaMetaData, QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -187,6 +187,12 @@ class PlayerWindow(QMainWindow):
         self.audio = QAudioOutput(self)
         self.player = QMediaPlayer(self)
         self.player.setAudioOutput(self.audio)
+        self._media_devices = QMediaDevices(self)
+        self._media_devices.audioOutputsChanged.connect(self._on_audio_outputs_changed)
+        self._audio_watch = QTimer(self)
+        self._audio_watch.setInterval(1500)
+        self._audio_watch.timeout.connect(self._sync_default_audio_output)
+        self._audio_watch.start()
         self.sink = None
         self.surface.sinkReady.connect(self._attach_video_sink)
         self._attach_video_sink()
@@ -980,6 +986,38 @@ class PlayerWindow(QMainWindow):
         self.audio.setVolume((self._volume / 100.0) ** 2)
         self.audio.setMuted(self._muted)
         self.surface.controls.set_volume(self._volume, self._muted)
+
+    # ----------------------------------------------------------------- audio
+    def _sync_default_audio_output(self) -> None:
+        """Follow the Windows default output device while the player is running."""
+        device = QMediaDevices.defaultAudioOutput()
+        if device is None or device.isNull():
+            return
+        current = self.audio.device()
+        if current is not None and not current.isNull() and bytes(current.id()) == bytes(device.id()):
+            return
+        self._switch_audio_device(device)
+
+    def _on_audio_outputs_changed(self) -> None:
+        current = self.audio.device()
+        available = {bytes(item.id()) for item in QMediaDevices.audioOutputs()}
+        if current is None or current.isNull() or bytes(current.id()) not in available:
+            self._sync_default_audio_output()
+
+    def _switch_audio_device(self, device) -> None:
+        if device is None or device.isNull():
+            return
+        try:
+            self.audio.setDevice(device)
+        except Exception:
+            logging.exception("Could not switch audio output device")
+            return
+        # setDevice() keeps the volume in most cases, but reapply it so the
+        # squared volume curve and mute state always match the UI.
+        self._apply_volume()
+        logging.info("Audio output: %s", device.description())
+        if self._has_media() and not self._loading and not self._ui_hidden:
+            self.surface.show_toast(f"Звук · {device.description()}", timeout=1600)
 
     def _on_volume_slider(self, value: int) -> None:
         was_muted = self._muted

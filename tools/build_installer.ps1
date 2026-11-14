@@ -12,6 +12,7 @@ if (-not (Test-Path $Python)) {
 $candidates = @(
     $env:ISCC,
     (Join-Path $Root '..\Tools\InnoSetup\ISCC.exe'),
+    (Join-Path $Root '..\..\Tools\InnoSetup\ISCC.exe'),
     'C:\Program Files\Inno Setup 7\ISCC.exe',
     'C:\Program Files (x86)\Inno Setup 7\ISCC.exe',
     'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
